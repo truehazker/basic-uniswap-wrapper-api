@@ -4,11 +4,15 @@
     "json",
     "ts"
   ],
-  "rootDir": "./integration",
+  "rootDir": ".",
   "testEnvironment": "node",
-  "testRegex": ".spec.ts$",
+  "testRegex": ".integration-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@modules/(.*)$": "<rootDir>/../src/modules/$1"
   },
   "passWithNoTests": true
 }

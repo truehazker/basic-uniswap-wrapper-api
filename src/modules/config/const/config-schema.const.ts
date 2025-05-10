@@ -12,6 +12,10 @@ export const configSchema = z.object({
     .default('production'),
 
   RPC_URL: z.string().url(),
+
+  GAS_MONITORING_INTERVAL: z.number().default(1000),
+
+  UNISWAP_FACTORY_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/).default('0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'),
 });
 
 export type TConfig = z.infer<typeof configSchema>;

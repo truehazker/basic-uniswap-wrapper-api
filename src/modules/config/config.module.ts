@@ -6,7 +6,7 @@ import { ConfigService } from '@/modules/config/config.service';
   imports: [
     // NOTE: NestConfigModule initializes itself with the same name as our custom ConfigModule
     //       and it's not possible to change it. So we have two 'ConfigModule dependencies initialized' messages
-    //       in the console.
+    //       in the logs.
     NestConfigModule.forRoot({
       envFilePath: process.env.NODE_ENV 
         ? ['.env', `.env.${process.env.NODE_ENV}`] // Will work even if env-specific file is missing
