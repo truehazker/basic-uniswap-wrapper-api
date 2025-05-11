@@ -1,4 +1,4 @@
-import { FastifyAdapter } from "@nestjs/platform-fastify";
+import { FastifyAdapter } from '@nestjs/platform-fastify';
 
 const fastifyAdapter = new FastifyAdapter({
   trustProxy: true,

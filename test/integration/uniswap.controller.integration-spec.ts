@@ -1,9 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UniswapController } from '@/modules/uniswap/uniswap.controller';
 import { UniswapService } from '@/modules/uniswap/uniswap.service';
-import { InternalServerErrorException, BadRequestException, ValidationPipe } from '@nestjs/common';
-import { AmountOutResponseDto, AmountOutRequestDto } from '@/modules/uniswap/dtos/amount-out.dto';
-import { mockAmountOutResponse, mockValidParams, validateAmountOutResponse } from '../utils/uniswap.test-utils';
+import {
+  InternalServerErrorException,
+  BadRequestException,
+  ValidationPipe,
+} from '@nestjs/common';
+import { AmountOutRequestDto } from '@/modules/uniswap/dtos/amount-out.dto';
+import {
+  mockAmountOutResponse,
+  mockValidParams,
+  validateAmountOutResponse,
+} from '../utils/uniswap.test-utils';
 
 describe('UniswapController', () => {
   let uniswapController: UniswapController;
@@ -36,7 +44,9 @@ describe('UniswapController', () => {
 
   describe('getAmountOut', () => {
     it('should return a valid amount out when service call succeeds', async () => {
-      uniswapService.getAmountOut.mockResolvedValue(mockAmountOutResponse.amountOut);
+      uniswapService.getAmountOut.mockResolvedValue(
+        mockAmountOutResponse.amountOut,
+      );
 
       const validatedParams = await validationPipe.transform(mockValidParams, {
         type: 'param',
@@ -63,9 +73,9 @@ describe('UniswapController', () => {
         type: 'param',
         metatype: AmountOutRequestDto,
       });
-      await expect(uniswapController.getAmountOut(validatedParams)).rejects.toThrow(
-        InternalServerErrorException,
-      );
+      await expect(
+        uniswapController.getAmountOut(validatedParams),
+      ).rejects.toThrow(InternalServerErrorException);
       expect(uniswapService.getAmountOut).toHaveBeenCalledTimes(1);
       expect(uniswapService.getAmountOut).toHaveBeenCalledWith(
         mockValidParams.fromTokenAddress,
@@ -80,10 +90,12 @@ describe('UniswapController', () => {
         fromTokenAddress: '0xinvalid',
       };
 
-      await expect(validationPipe.transform(invalidParams, {
-        type: 'param',
-        metatype: AmountOutRequestDto,
-      })).rejects.toThrow(BadRequestException);
+      await expect(
+        validationPipe.transform(invalidParams, {
+          type: 'param',
+          metatype: AmountOutRequestDto,
+        }),
+      ).rejects.toThrow(BadRequestException);
       expect(uniswapService.getAmountOut).not.toHaveBeenCalled();
     });
 
@@ -93,11 +105,13 @@ describe('UniswapController', () => {
         amountIn: '0xinvalid',
       };
 
-      await expect(validationPipe.transform(invalidParams, {
-        type: 'param',
-        metatype: AmountOutRequestDto,
-      })).rejects.toThrow(BadRequestException);
+      await expect(
+        validationPipe.transform(invalidParams, {
+          type: 'param',
+          metatype: AmountOutRequestDto,
+        }),
+      ).rejects.toThrow(BadRequestException);
       expect(uniswapService.getAmountOut).not.toHaveBeenCalled();
     });
   });
-}); 
+});
