@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
 export const configSchema = z.object({
+  LOG_LEVEL: z
+    .string()
+    .transform((val) => val.split(',').map((level) => level.trim()))
+    .pipe(z.array(z.enum(['log', 'error', 'warn', 'debug', 'verbose'])))
+    .default('log,error,warn,debug,verbose'),
+
   SERVER_HOST: z
     .string()
     .regex(/^[a-z0-9-.]+$/i)

@@ -12,8 +12,14 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     fastifyAdapter,
+    {
+      bufferLogs: true,
+    },
   );
 
+  const configService = app.get(ConfigService);
+
+  Logger.overrideLogger(configService.get('LOG_LEVEL'));
   const logger = new Logger('Bootstrap');
 
   // Enable validation
@@ -23,7 +29,6 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }));
 
-  const configService = app.get(ConfigService);
   const env = configService.get('NODE_ENV');
 
   // Swagger setup for development
