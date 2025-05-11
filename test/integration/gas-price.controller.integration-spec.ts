@@ -2,8 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GasPriceController } from '@/modules/gas-price/gas-price.controller';
 import { GasPriceService } from '@/modules/gas-price/gas-price.service';
 import { InternalServerErrorException } from '@nestjs/common';
-import { GasPriceResponseDto } from '@/modules/gas-price/dtos/gas-price.dto';
-import { mockGasPriceResponse, validateGasPriceResponse } from '../utils/gas-price.test-utils';
+import {
+  mockGasPriceResponse,
+  validateGasPriceResponse,
+} from '../utils/gas-price.test-utils';
 
 describe('GasPriceController', () => {
   let gasPriceController: GasPriceController;
@@ -50,4 +52,4 @@ describe('GasPriceController', () => {
       expect(gasPriceService.getGasPrice).toHaveBeenCalledTimes(1);
     });
   });
-}); 
+});

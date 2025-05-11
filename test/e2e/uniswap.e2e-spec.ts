@@ -4,8 +4,12 @@ import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import fastifyAdapter from '@/fastify-adapter';
 import { AmountOutResponseDto } from '@/modules/uniswap/dtos/amount-out.dto';
 import { UniswapService } from '@/modules/uniswap/uniswap.service';
-import { BadRequestException, InternalServerErrorException, NotFoundException, ValidationPipe } from '@nestjs/common';
-import { validateAmountOutResponse, mockValidParams, mockAmountOutResponse } from '../utils/uniswap.test-utils';
+import { NotFoundException, ValidationPipe } from '@nestjs/common';
+import {
+  validateAmountOutResponse,
+  mockValidParams,
+  mockAmountOutResponse,
+} from '../utils/uniswap.test-utils';
 
 describe('Uniswap (e2e)', () => {
   let app: NestFastifyApplication;
@@ -20,24 +24,27 @@ describe('Uniswap (e2e)', () => {
     moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     })
-    .overrideProvider(UniswapService)
-    .useValue(mockUniswapService)
-    .compile();
+      .overrideProvider(UniswapService)
+      .useValue(mockUniswapService)
+      .compile();
 
-    app = moduleFixture.createNestApplication<NestFastifyApplication>(
-      fastifyAdapter,
-    );
+    app =
+      moduleFixture.createNestApplication<NestFastifyApplication>(
+        fastifyAdapter,
+      );
 
     // Enable validation
-    app.useGlobalPipes(new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-    }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
 
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
-    
+
     uniswapService = app.get<UniswapService>(UniswapService);
   });
 
@@ -47,7 +54,9 @@ describe('Uniswap (e2e)', () => {
 
   describe('GET /return/:fromTokenAddress/:toTokenAddress/:amountIn', () => {
     it('should return a valid amount out response', async () => {
-      jest.spyOn(uniswapService, 'getAmountOut').mockResolvedValueOnce(mockAmountOutResponse.amountOut);
+      jest
+        .spyOn(uniswapService, 'getAmountOut')
+        .mockResolvedValueOnce(mockAmountOutResponse.amountOut);
 
       const response = await app.inject({
         method: 'GET',
@@ -60,17 +69,19 @@ describe('Uniswap (e2e)', () => {
     });
 
     it('should respond within 100ms', async () => {
-      jest.spyOn(uniswapService, 'getAmountOut').mockResolvedValueOnce(mockAmountOutResponse.amountOut);
-      
+      jest
+        .spyOn(uniswapService, 'getAmountOut')
+        .mockResolvedValueOnce(mockAmountOutResponse.amountOut);
+
       const startTime = Date.now();
-      
+
       const response = await app.inject({
         method: 'GET',
         url: `/return/${mockValidParams.fromTokenAddress}/${mockValidParams.toTokenAddress}/${mockValidParams.amountIn}`,
       });
 
       const responseTime = Date.now() - startTime;
-      
+
       expect(response.statusCode).toEqual(200);
       expect(responseTime).toBeLessThan(100);
     });
@@ -83,7 +94,9 @@ describe('Uniswap (e2e)', () => {
 
       expect(response.statusCode).toEqual(400);
       const body = JSON.parse(response.payload);
-      expect(body.message).toEqual(['fromTokenAddress must be an Ethereum address']);
+      expect(body.message).toEqual([
+        'fromTokenAddress must be an Ethereum address',
+      ]);
     });
 
     it('should handle invalid amount in with 400 status', async () => {
@@ -99,9 +112,9 @@ describe('Uniswap (e2e)', () => {
 
     it('should handle service errors with 404 status', async () => {
       const errorMessage = 'Failed to calculate amount out';
-      jest.spyOn(uniswapService, 'getAmountOut').mockRejectedValueOnce(
-        new NotFoundException(errorMessage),
-      );
+      jest
+        .spyOn(uniswapService, 'getAmountOut')
+        .mockRejectedValueOnce(new NotFoundException(errorMessage));
 
       const response = await app.inject({
         method: 'GET',
@@ -113,4 +126,4 @@ describe('Uniswap (e2e)', () => {
       expect(body.message).toBe(errorMessage);
     });
   });
-}); 
+});

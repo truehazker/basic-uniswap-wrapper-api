@@ -1,10 +1,21 @@
-import { Injectable, Inject, OnModuleInit, OnModuleDestroy, Logger, ServiceUnavailableException, BadGatewayException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+  BadGatewayException,
+} from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { ethers } from 'ethers';
 import { ConfigService } from '../config/config.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { GasPriceResponseDto } from './dtos/gas-price.dto';
 import { THexString } from '@/types/common';
+
+export interface IGasPriceOptions {
+  refresh?: boolean;
+}
 
 @Injectable()
 export class GasPriceService implements OnModuleInit, OnModuleDestroy {
@@ -19,20 +30,19 @@ export class GasPriceService implements OnModuleInit, OnModuleDestroy {
     private configService: ConfigService,
   ) {
     this.CACHE_TTL = this.configService.get('GAS_MONITORING_INTERVAL');
-  }
-
-  async onModuleInit() {
     this.provider = new ethers.JsonRpcProvider(
       this.configService.get('RPC_URL'),
     );
+  }
 
+  async onModuleInit() {
     try {
       const { gasPrice } = await this.getGasPrice();
       this.logger.verbose(`Initial gas price fetched: ${gasPrice}`);
     } catch (error) {
       this.logger.error('Failed to fetch initial gas price:', error);
     }
-    
+
     await this.startGasPriceUpdates();
   }
 
@@ -41,12 +51,14 @@ export class GasPriceService implements OnModuleInit, OnModuleDestroy {
       clearInterval(this.updateInterval);
       this.updateInterval.unref();
     }
-
-    this.provider.destroy();
   }
 
-  async getGasPrice({refresh = false}: {refresh?: boolean} = {}): Promise<GasPriceResponseDto> {
-    const cachedGasPrice = await this.cacheManager.get<THexString>(this.CACHE_KEY);
+  async getGasPrice({
+    refresh = false,
+  }: IGasPriceOptions = {}): Promise<GasPriceResponseDto> {
+    const cachedGasPrice = await this.cacheManager.get<THexString>(
+      this.CACHE_KEY,
+    );
 
     if (cachedGasPrice && !refresh) {
       return { gasPrice: cachedGasPrice };
@@ -60,9 +72,15 @@ export class GasPriceService implements OnModuleInit, OnModuleDestroy {
 
     const gasPriceInHex: THexString = `0x${gasPrice.toString(16)}`;
 
-    await this.cacheManager.set<THexString>(this.CACHE_KEY, gasPriceInHex, this.CACHE_TTL);
+    await this.cacheManager.set<THexString>(
+      this.CACHE_KEY,
+      gasPriceInHex,
+      this.CACHE_TTL,
+    );
 
-    return { gasPrice: gasPriceInHex };
+    return {
+      gasPrice: gasPriceInHex,
+    };
   }
 
   // Background job to update gas price periodically
@@ -76,7 +94,7 @@ export class GasPriceService implements OnModuleInit, OnModuleDestroy {
         this.logger.error('Failed to update gas price:', error);
       }
     }, this.CACHE_TTL);
-    
+
     // Ensure the interval doesn't keep the process alive
     this.updateInterval.unref();
   }

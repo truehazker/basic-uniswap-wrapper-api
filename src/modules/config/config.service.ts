@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
-import { configSchema, TConfig } from '@/modules/config/const/config-schema.const';
+import {
+  configSchema,
+  TConfig,
+} from '@/modules/config/const/config-schema.const';
 
 /**
  * A service for accessing the application configuration.

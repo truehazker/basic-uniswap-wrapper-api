@@ -17,13 +17,14 @@ describe('GasPrice (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication<NestFastifyApplication>(
-      fastifyAdapter,
-    );
+    app =
+      moduleFixture.createNestApplication<NestFastifyApplication>(
+        fastifyAdapter,
+      );
 
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
-    
+
     gasPriceService = app.get<GasPriceService>(GasPriceService);
   });
 
@@ -45,23 +46,23 @@ describe('GasPrice (e2e)', () => {
 
     it('should respond within 50ms', async () => {
       const startTime = Date.now();
-      
+
       const response = await app.inject({
         method: 'GET',
         url: '/gasPrice',
       });
 
       const responseTime = Date.now() - startTime;
-      
+
       expect(response.statusCode).toEqual(200);
       expect(responseTime).toBeLessThan(50);
     });
 
     it('should handle RPC node unavailability with 503 status', async () => {
       const errorMessage = 'RPC node is currently unavailable';
-      jest.spyOn(gasPriceService, 'getGasPrice').mockRejectedValueOnce(
-        new ServiceUnavailableException(errorMessage),
-      );
+      jest
+        .spyOn(gasPriceService, 'getGasPrice')
+        .mockRejectedValueOnce(new ServiceUnavailableException(errorMessage));
 
       const response = await app.inject({
         method: 'GET',

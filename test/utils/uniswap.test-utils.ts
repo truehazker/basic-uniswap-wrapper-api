@@ -1,11 +1,14 @@
-import { ethers } from 'ethers';
-import { NotFoundException, Logger, BadRequestException, InternalServerErrorException, ValidationPipe } from '@nestjs/common';
-import { AmountOutRequestDto, AmountOutResponseDto } from '@/modules/uniswap/dtos/amount-out.dto';
+import { NotFoundException, Logger } from '@nestjs/common';
+import {
+  AmountOutRequestDto,
+  AmountOutResponseDto,
+} from '@/modules/uniswap/dtos/amount-out.dto';
 
 // Mock Data
-export const MOCK_TOKENS = {
-  TOKEN_A: '0x1111111111111111111111111111111111111111',
-  TOKEN_B: '0x2222222222222222222222222222222222222222',
+export const MOCK_ADDRESSES = {
+  TOKEN_A: '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
+  TOKEN_B: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+  PAIR_ADDRESS: '0xd3d2E2692501A5c9Ca623199D38826e513033a17',
   NON_EXISTENT: '0x3333333333333333333333333333333333333333',
   INVALID: '0xinvalid',
 } as const;
@@ -23,8 +26,8 @@ export const MOCK_RESERVES = {
 
 // Request/Response Mocks
 export const mockValidParams: AmountOutRequestDto = {
-  fromTokenAddress: MOCK_TOKENS.TOKEN_A,
-  toTokenAddress: MOCK_TOKENS.TOKEN_B,
+  fromTokenAddress: MOCK_ADDRESSES.TOKEN_A,
+  toTokenAddress: MOCK_ADDRESSES.TOKEN_B,
   amountIn: '0x1', // Keep as hex string to match DTO type
 };
 
@@ -41,21 +44,26 @@ export const validateAmountOutResponse = (response: AmountOutResponseDto) => {
 
 // Unit Test Helpers
 export const createMockPairContract = () => ({
-  getReserves: jest.fn().mockResolvedValue([
-    MOCK_RESERVES.TOKEN_A_RESERVE,
-    MOCK_RESERVES.TOKEN_B_RESERVE,
-    MOCK_RESERVES.BLOCK_TIMESTAMP,
-  ]),
-  token0: jest.fn().mockResolvedValue(MOCK_TOKENS.TOKEN_A),
+  getReserves: jest.fn().mockResolvedValue({
+    reserve0: MOCK_RESERVES.TOKEN_A_RESERVE,
+    reserve1: MOCK_RESERVES.TOKEN_B_RESERVE,
+    blockTimestampLast: MOCK_RESERVES.BLOCK_TIMESTAMP,
+  }),
+  token0: jest.fn().mockResolvedValue(MOCK_ADDRESSES.TOKEN_A),
 });
 
 export const createMockGetPairContract = (service: any) => {
-  return jest.spyOn(service, 'getPairContract').mockImplementation(async (tokenA: string, tokenB: string) => {
-    if (tokenA === MOCK_TOKENS.TOKEN_A && tokenB === MOCK_TOKENS.TOKEN_B) {
-      return createMockPairContract();
-    }
-    throw new NotFoundException('Pair not found');
-  });
+  return jest
+    .spyOn(service, 'getPairContract')
+    .mockImplementation(async (tokenA: string, tokenB: string) => {
+      if (
+        tokenA === MOCK_ADDRESSES.TOKEN_A &&
+        tokenB === MOCK_ADDRESSES.TOKEN_B
+      ) {
+        return createMockPairContract();
+      }
+      throw new NotFoundException('Pair not found');
+    });
 };
 
 export const mockLogger = () => {
@@ -70,34 +78,12 @@ export const calculateExpectedAmountOut = (amountIn: string): string => {
 
   // Uniswap V2 formula: amountOut = (amountIn * reserveOut) / (reserveIn + amountIn)
   const amountOut = (amountInBN * reserveOut) / (reserveIn + amountInBN);
-  
+
   return `0x${amountOut.toString(16)}`;
-};
-
-// Integration Test Helpers
-export const createMockUniswapService = () => ({
-  getAmountOut: jest.fn(),
-});
-
-export const createValidationPipe = () => {
-  return new ValidationPipe({
-    transform: true,
-    whitelist: true,
-    forbidNonWhitelisted: true,
-  });
-};
-
-// E2E Test Helpers
-export const createMockApp = async (moduleFixture: any) => {
-  const app = moduleFixture.createNestApplication();
-  app.useGlobalPipes(createValidationPipe());
-  await app.init();
-  return app;
 };
 
 // Common Test Setup
 export const setupUniswapTest = async (service: any) => {
-  createMockGetPairContract(service);
   return {
     mockGetPairContract: createMockGetPairContract(service),
     mockLogger: mockLogger(),

@@ -1,6 +1,11 @@
-import { THexString } from "@/types/common";
-import { ApiProperty } from "@nestjs/swagger";
-import { IsString, IsNotEmpty, IsEthereumAddress, IsHexadecimal } from "class-validator";
+import { THexString } from '@/types/common';
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsString,
+  IsNotEmpty,
+  IsEthereumAddress,
+  IsHexadecimal,
+} from 'class-validator';
 
 export class AmountOutRequestDto {
   @ApiProperty({

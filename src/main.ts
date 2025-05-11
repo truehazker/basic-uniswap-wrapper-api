@@ -1,8 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '@/app.module';
-import {
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import fastifyAdapter from '@/fastify-adapter';
 import { ConfigService } from '@/modules/config/config.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -23,21 +21,23 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   // Enable validation
-  app.useGlobalPipes(new ValidationPipe({
-    transform: true,
-    whitelist: true,
-    forbidNonWhitelisted: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
   const env = configService.get('NODE_ENV');
 
   // Swagger setup for development
   if (env === 'development') {
     const swaggerConfig = new DocumentBuilder()
-    .setTitle('Basic Uniswap Wrapper API')
-    .setDescription('The basic uniswap wrapper API documentation')
-    .setVersion('1.0')
-    .build();
+      .setTitle('Basic Uniswap Wrapper API')
+      .setDescription('The basic uniswap wrapper API documentation')
+      .setVersion('1.0')
+      .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('api', app, document);
