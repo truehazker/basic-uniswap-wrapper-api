@@ -1,6 +1,6 @@
 import { AddressLike, ethers } from 'ethers';
 
-export interface IGetReserves {
+interface IGetReserves {
   reserve0: bigint;
   reserve1: bigint;
   blockTimestampLast: bigint;

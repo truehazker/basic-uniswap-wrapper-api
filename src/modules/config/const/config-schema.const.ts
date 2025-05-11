@@ -17,7 +17,11 @@ export const configSchema = z.object({
 
   RPC_URL: z.string().url(),
 
-  GAS_MONITORING_INTERVAL: z.number().default(1000),
+  GAS_MONITORING_INTERVAL: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .default('1000'),
 
   UNISWAP_FACTORY_ADDRESS: z
     .string()

@@ -5,17 +5,14 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { ethers } from 'ethers';
+import { ConfigModule } from '@modules/config/config.module';
 
 describe('GasPriceService', () => {
   let service: GasPriceService;
   let cacheManager: Cache;
   let mockProvider: { getFeeData: jest.Mock };
   let loggerSpy: jest.SpyInstance;
-
-  const mockConfig = {
-    RPC_URL: 'https://mock-rpc-url',
-    GAS_MONITORING_INTERVAL: 10000,
-  } as const;
+  let configService: ConfigService;
 
   const mockGasPrice = BigInt('50000000000'); // 50 gwei
 
@@ -43,14 +40,9 @@ describe('GasPriceService', () => {
       );
 
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ConfigModule],
       providers: [
         GasPriceService,
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: keyof typeof mockConfig) => mockConfig[key]),
-          },
-        },
         {
           provide: CACHE_MANAGER,
           useValue: mockCacheManager,
@@ -59,6 +51,7 @@ describe('GasPriceService', () => {
     }).compile();
 
     service = module.get<GasPriceService>(GasPriceService);
+    configService = module.get<ConfigService>(ConfigService);
     cacheManager = module.get<Cache>(CACHE_MANAGER);
   });
 
@@ -86,6 +79,7 @@ describe('GasPriceService', () => {
       loggerSpy = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
+
       mockProvider.getFeeData.mockRejectedValueOnce(new Error('RPC error'));
 
       await service.onModuleInit();
@@ -98,6 +92,7 @@ describe('GasPriceService', () => {
   describe('onModuleDestroy', () => {
     it('should clear update interval on module destroy', async () => {
       await service.onModuleInit();
+
       const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
 
       await service.onModuleDestroy();
@@ -141,6 +136,7 @@ describe('GasPriceService', () => {
       loggerSpy = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
+
       jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(null);
       mockProvider.getFeeData.mockResolvedValueOnce({
         gasPrice: null,
@@ -155,6 +151,7 @@ describe('GasPriceService', () => {
       loggerSpy = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
+
       jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(null);
       mockProvider.getFeeData.mockRejectedValueOnce(new Error('RPC error'));
 
@@ -168,7 +165,9 @@ describe('GasPriceService', () => {
       await service.startGasPriceUpdates();
 
       // Fast-forward time to trigger interval
-      await jest.advanceTimersByTimeAsync(mockConfig.GAS_MONITORING_INTERVAL);
+      await jest.advanceTimersByTimeAsync(
+        configService.get('GAS_MONITORING_INTERVAL'),
+      );
 
       expect(mockProvider.getFeeData).toHaveBeenCalled();
       expect(cacheManager.set).toHaveBeenCalledWith(
@@ -182,13 +181,16 @@ describe('GasPriceService', () => {
       loggerSpy = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
+
       mockProvider.getFeeData.mockRejectedValueOnce(new Error('RPC error'));
 
       // Start the updates
       await service.startGasPriceUpdates();
 
       // Fast-forward time to trigger interval
-      await jest.advanceTimersByTimeAsync(mockConfig.GAS_MONITORING_INTERVAL);
+      await jest.advanceTimersByTimeAsync(
+        configService.get('GAS_MONITORING_INTERVAL'),
+      );
 
       expect(mockProvider.getFeeData).toHaveBeenCalled();
       expect(cacheManager.set).not.toHaveBeenCalled();

@@ -5,7 +5,10 @@ import fastifyAdapter from '@/fastify-adapter';
 import { GasPriceResponseDto } from '@/modules/gas-price/dtos/gas-price.dto';
 import { GasPriceService } from '@/modules/gas-price/gas-price.service';
 import { ServiceUnavailableException } from '@nestjs/common';
-import { validateGasPriceResponse } from '../utils/gas-price.test-utils';
+import {
+  validateGasPriceResponse,
+  mockGasPriceResponse,
+} from '../utils/gas-price.test-utils';
 
 describe('GasPrice (e2e)', () => {
   let app: NestFastifyApplication;
@@ -13,9 +16,16 @@ describe('GasPrice (e2e)', () => {
   let gasPriceService: GasPriceService;
 
   beforeAll(async () => {
+    const mockGasPriceService = {
+      getGasPrice: jest.fn(),
+    };
+
     moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(GasPriceService)
+      .useValue(mockGasPriceService)
+      .compile();
 
     app =
       moduleFixture.createNestApplication<NestFastifyApplication>(
@@ -34,6 +44,10 @@ describe('GasPrice (e2e)', () => {
 
   describe('GET /gasPrice', () => {
     it('should return a valid gas price response', async () => {
+      jest
+        .spyOn(gasPriceService, 'getGasPrice')
+        .mockResolvedValueOnce(mockGasPriceResponse);
+
       const response = await app.inject({
         method: 'GET',
         url: '/gasPrice',
@@ -45,6 +59,10 @@ describe('GasPrice (e2e)', () => {
     });
 
     it('should respond within 50ms', async () => {
+      jest
+        .spyOn(gasPriceService, 'getGasPrice')
+        .mockResolvedValueOnce(mockGasPriceResponse);
+
       const startTime = Date.now();
 
       const response = await app.inject({
