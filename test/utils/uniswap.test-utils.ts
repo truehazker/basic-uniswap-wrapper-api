@@ -3,6 +3,7 @@ import {
   AmountOutRequestDto,
   AmountOutResponseDto,
 } from '@/modules/uniswap/dtos/amount-out.dto';
+import { UniswapService } from '@modules/uniswap/uniswap.service';
 
 // Mock Data
 export const MOCK_ADDRESSES = {
@@ -52,9 +53,9 @@ export const createMockPairContract = () => ({
   token0: jest.fn().mockResolvedValue(MOCK_ADDRESSES.TOKEN_A),
 });
 
-export const createMockGetPairContract = (service: any) => {
+export const createMockGetPairContract = (service: UniswapService) => {
   return jest
-    .spyOn(service, 'getPairContract')
+    .spyOn(service as any, 'getPairContract')
     .mockImplementation(async (tokenA: string, tokenB: string) => {
       if (
         tokenA === MOCK_ADDRESSES.TOKEN_A &&
@@ -83,7 +84,7 @@ export const calculateExpectedAmountOut = (amountIn: string): string => {
 };
 
 // Common Test Setup
-export const setupUniswapTest = async (service: any) => {
+export const setupUniswapTest = async (service: UniswapService) => {
   return {
     mockGetPairContract: createMockGetPairContract(service),
     mockLogger: mockLogger(),
