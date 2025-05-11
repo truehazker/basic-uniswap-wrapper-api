@@ -12,5 +12,5 @@ export const validateGasPriceResponse = (response: GasPriceResponseDto) => {
 };
 
 export const mockGasPriceResponse: GasPriceResponseDto = {
-  gasPrice: '0x19',
+  gasPrice: '0x1337',
 };

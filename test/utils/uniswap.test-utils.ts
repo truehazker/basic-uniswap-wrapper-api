@@ -1,4 +1,4 @@
-import { NotFoundException, Logger } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import {
   AmountOutRequestDto,
   AmountOutResponseDto,
@@ -12,11 +12,6 @@ export const MOCK_ADDRESSES = {
   PAIR_ADDRESS: '0xd3d2E2692501A5c9Ca623199D38826e513033a17',
   NON_EXISTENT: '0x3333333333333333333333333333333333333333',
   INVALID: '0xinvalid',
-} as const;
-
-export const MOCK_CONFIG = {
-  RPC_URL: 'https://mock-rpc-url',
-  UNISWAP_FACTORY_ADDRESS: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
 } as const;
 
 export const MOCK_RESERVES = {
@@ -67,10 +62,6 @@ export const createMockGetPairContract = (service: UniswapService) => {
     });
 };
 
-export const mockLogger = () => {
-  return jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
-};
-
 export const calculateExpectedAmountOut = (amountIn: string): string => {
   // Convert hex string to decimal and parse with 18 decimals
   const amountInBN = BigInt(amountIn);
@@ -81,12 +72,4 @@ export const calculateExpectedAmountOut = (amountIn: string): string => {
   const amountOut = (amountInBN * reserveOut) / (reserveIn + amountInBN);
 
   return `0x${amountOut.toString(16)}`;
-};
-
-// Common Test Setup
-export const setupUniswapTest = async (service: UniswapService) => {
-  return {
-    mockGetPairContract: createMockGetPairContract(service),
-    mockLogger: mockLogger(),
-  };
 };

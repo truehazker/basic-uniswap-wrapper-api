@@ -10,6 +10,7 @@ import {
   mockValidParams,
   mockAmountOutResponse,
 } from '../utils/uniswap.test-utils';
+import { GasPriceService } from '@modules/gas-price/gas-price.service';
 
 describe('Uniswap (e2e)', () => {
   let app: NestFastifyApplication;
@@ -26,6 +27,8 @@ describe('Uniswap (e2e)', () => {
     })
       .overrideProvider(UniswapService)
       .useValue(mockUniswapService)
+      .overrideProvider(GasPriceService)
+      .useValue({})
       .compile();
 
     app =

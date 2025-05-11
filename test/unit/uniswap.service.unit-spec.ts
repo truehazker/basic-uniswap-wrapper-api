@@ -1,44 +1,42 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UniswapService } from '@/modules/uniswap/uniswap.service';
 import { ConfigService } from '@/modules/config/config.service';
-import { NotFoundException } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
 import {
-  MOCK_CONFIG,
   MOCK_ADDRESSES,
-  setupUniswapTest,
   calculateExpectedAmountOut,
+  createMockGetPairContract,
 } from '../utils/uniswap.test-utils';
+import { ConfigModule } from '@modules/config/config.module';
 
 describe('UniswapService', () => {
   let service: UniswapService;
   let mockGetPairContract: jest.SpyInstance;
+  let loggerSpy: jest.SpyInstance;
+  let configService: ConfigService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        UniswapService,
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: keyof typeof MOCK_CONFIG) => MOCK_CONFIG[key]),
-          },
-        },
-      ],
+      imports: [ConfigModule],
+      providers: [UniswapService],
     }).compile();
 
     service = module.get<UniswapService>(UniswapService);
-    const mocks = await setupUniswapTest(service);
-    mockGetPairContract = mocks.mockGetPairContract;
+    configService = module.get<ConfigService>(ConfigService);
+    mockGetPairContract = createMockGetPairContract(service);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    if (loggerSpy) {
+      loggerSpy.mockRestore();
+    }
   });
 
   describe('calculatePairAddress', () => {
     it('should calculate correct pair address for sorted tokens', () => {
       const pairAddress = (service as any).calculatePairAddress(
-        MOCK_CONFIG.UNISWAP_FACTORY_ADDRESS,
+        configService.get('UNISWAP_FACTORY_ADDRESS'),
         MOCK_ADDRESSES.TOKEN_A,
         MOCK_ADDRESSES.TOKEN_B,
       );
@@ -51,12 +49,12 @@ describe('UniswapService', () => {
     it('should handle unsorted tokens correctly', () => {
       // Cast to 'any' to be able to access private method
       const pairAddress1 = (service as any).calculatePairAddress(
-        MOCK_CONFIG.UNISWAP_FACTORY_ADDRESS,
+        configService.get('UNISWAP_FACTORY_ADDRESS'),
         MOCK_ADDRESSES.TOKEN_B,
         MOCK_ADDRESSES.TOKEN_A,
       );
       const pairAddress2 = (service as any).calculatePairAddress(
-        MOCK_CONFIG.UNISWAP_FACTORY_ADDRESS,
+        configService.get('UNISWAP_FACTORY_ADDRESS'),
         MOCK_ADDRESSES.TOKEN_A,
         MOCK_ADDRESSES.TOKEN_B,
       );
@@ -84,6 +82,10 @@ describe('UniswapService', () => {
     });
 
     it('should throw NotFoundException when pair does not exist', async () => {
+      loggerSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => {});
+
       await expect(
         service.getAmountOut(
           MOCK_ADDRESSES.NON_EXISTENT,
@@ -94,6 +96,10 @@ describe('UniswapService', () => {
     });
 
     it('should handle errors and rethrow them', async () => {
+      loggerSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => {});
+
       mockGetPairContract.mockRejectedValueOnce(new Error('RPC error'));
 
       await expect(
