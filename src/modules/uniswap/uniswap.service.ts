@@ -1,8 +1,13 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ethers, getAddress, keccak256, solidityPacked } from 'ethers';
 import { ConfigService } from '../config/config.service';
 import { GasPriceService } from '../gas-price/gas-price.service';
 import { THexString } from '@/types/common';
+
+// ERC20 ABI
+const ERC20_ABI = [
+  'function decimals() external view returns (uint8)',
+];
 
 // Uniswap V2 Pair ABI
 const PAIR_ABI = [
@@ -11,18 +16,26 @@ const PAIR_ABI = [
   'function token1() external view returns (address)',
 ];
 
+// Uniswap V2 INIT_CODE_HASH
+const INIT_CODE_HASH = '0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f';
+
 @Injectable()
-export class UniswapService {
+export class UniswapService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(UniswapService.name);
   private provider: ethers.JsonRpcProvider;
-  private readonly INIT_CODE_HASH = '0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f'; // Uniswap V2 INIT_CODE_HASH
 
   constructor(
     private configService: ConfigService,
-  ) {
+  ) {}
+
+  async onModuleInit() {
     this.provider = new ethers.JsonRpcProvider(
       this.configService.get('RPC_URL'),
     );
+  }
+
+  async onModuleDestroy() {
+    this.provider.destroy();
   }
 
   private calculatePairAddress(factory: string, tokenA: string, tokenB: string): string {
@@ -35,7 +48,7 @@ export class UniswapService {
 
     const packed = solidityPacked(
       ['bytes1', 'address', 'bytes32', 'bytes32'],
-      ['0xff', factory, salt, this.INIT_CODE_HASH]
+      ['0xff', factory, salt, INIT_CODE_HASH]
     );
   
     const addressBytes = keccak256(packed);
@@ -59,7 +72,6 @@ export class UniswapService {
     return new ethers.Contract(pairAddress, PAIR_ABI, this.provider);
   }
 
-  // Costs 100 points if successful, 20 points if not found, so we save 80 points by checking if the pair contract exists first
   async getAmountOut(
     fromTokenAddress: string,
     toTokenAddress: string,
@@ -68,13 +80,13 @@ export class UniswapService {
     try {
       const pairContract = await this.getPairContract(fromTokenAddress, toTokenAddress);
 
-      // Costs 80 points
+      // Get reserves and token0 in parallel
       const [reserves, token0] = await Promise.all([
         pairContract.getReserves(),
         pairContract.token0(),
       ]);
 
-      const amountInBN = ethers.parseUnits(amountIn, 18); // Assuming 18 decimals
+      const amountInBN = BigInt(amountIn);
       const reserveIn = token0.toLowerCase() === fromTokenAddress.toLowerCase() ? reserves[0] : reserves[1];
       const reserveOut = token0.toLowerCase() === fromTokenAddress.toLowerCase() ? reserves[1] : reserves[0];
 

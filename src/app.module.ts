@@ -4,7 +4,11 @@ import { GasPriceModule } from '@modules/gas-price/gas-price.module';
 import { UniswapModule } from '@modules/uniswap/uniswap.module';
 
 @Module({
-  imports: [ConfigModule, GasPriceModule, UniswapModule],
+  imports: [
+    ConfigModule,
+    GasPriceModule,
+    UniswapModule,
+  ],
   controllers: [],
   providers: [],
 })

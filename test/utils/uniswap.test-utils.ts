@@ -64,7 +64,7 @@ export const mockLogger = () => {
 
 export const calculateExpectedAmountOut = (amountIn: string): string => {
   // Convert hex string to decimal and parse with 18 decimals
-  const amountInBN = ethers.parseUnits(amountIn, 18);
+  const amountInBN = BigInt(amountIn);
   const reserveIn = MOCK_RESERVES.TOKEN_A_RESERVE;
   const reserveOut = MOCK_RESERVES.TOKEN_B_RESERVE;
 

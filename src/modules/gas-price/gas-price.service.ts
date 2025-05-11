@@ -18,13 +18,14 @@ export class GasPriceService implements OnModuleInit, OnModuleDestroy {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private configService: ConfigService,
   ) {
-    this.provider = new ethers.JsonRpcProvider(
-      this.configService.get('RPC_URL'),
-    );
     this.CACHE_TTL = this.configService.get('GAS_MONITORING_INTERVAL');
   }
 
   async onModuleInit() {
+    this.provider = new ethers.JsonRpcProvider(
+      this.configService.get('RPC_URL'),
+    );
+
     try {
       const { gasPrice } = await this.getGasPrice();
       this.logger.verbose(`Initial gas price fetched: ${gasPrice}`);
@@ -40,6 +41,8 @@ export class GasPriceService implements OnModuleInit, OnModuleDestroy {
       clearInterval(this.updateInterval);
       this.updateInterval.unref();
     }
+
+    this.provider.destroy();
   }
 
   async getGasPrice({refresh = false}: {refresh?: boolean} = {}): Promise<GasPriceResponseDto> {
