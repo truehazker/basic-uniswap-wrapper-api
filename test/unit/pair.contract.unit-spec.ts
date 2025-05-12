@@ -1,19 +1,11 @@
 import { PairContract } from '@/modules/uniswap/contracts/pair.contract';
 import { ethers } from 'ethers';
+import { MOCK_ADDRESSES, MOCK_RESERVES } from '../utils/uniswap.test-utils';
 
 describe('PairContract', () => {
   let pairContract: PairContract;
   let mockContract: jest.Mocked<ethers.Contract>;
   let mockProvider: jest.Mocked<ethers.Provider>;
-
-  const mockPairAddress = '0x3333333333333333333333333333333333333333';
-  const mockReserves = {
-    reserve0: BigInt('1000000'),
-    reserve1: BigInt('2000000'),
-    blockTimestampLast: BigInt('0'),
-  };
-  const mockToken0 = '0x1111111111111111111111111111111111111111';
-  const mockToken1 = '0x2222222222222222222222222222222222222222';
 
   beforeEach(async () => {
     // Create mock contract with required methods
@@ -21,12 +13,12 @@ describe('PairContract', () => {
       getReserves: jest
         .fn()
         .mockResolvedValue([
-          mockReserves.reserve0,
-          mockReserves.reserve1,
-          mockReserves.blockTimestampLast,
+          MOCK_RESERVES.TOKEN_A_RESERVE,
+          MOCK_RESERVES.TOKEN_B_RESERVE,
+          MOCK_RESERVES.BLOCK_TIMESTAMP,
         ]),
-      token0: jest.fn().mockResolvedValue(mockToken0),
-      token1: jest.fn().mockResolvedValue(mockToken1),
+      token0: jest.fn().mockResolvedValue(MOCK_ADDRESSES.TOKEN_A),
+      token1: jest.fn().mockResolvedValue(MOCK_ADDRESSES.TOKEN_B),
     } as unknown as jest.Mocked<ethers.Contract>;
 
     // Create mock provider
@@ -35,7 +27,7 @@ describe('PairContract', () => {
     // Mock ethers.Contract constructor
     jest.spyOn(ethers, 'Contract').mockImplementation(() => mockContract);
 
-    pairContract = new PairContract(mockPairAddress, mockProvider);
+    pairContract = new PairContract(MOCK_ADDRESSES.PAIR_ADDRESS, mockProvider);
   });
 
   afterEach(() => {
@@ -45,7 +37,7 @@ describe('PairContract', () => {
   describe('constructor', () => {
     it('should create a contract instance with correct address and ABI', () => {
       expect(ethers.Contract).toHaveBeenCalledWith(
-        mockPairAddress,
+        MOCK_ADDRESSES.PAIR_ADDRESS,
         expect.any(Array),
         mockProvider,
       );
@@ -57,7 +49,11 @@ describe('PairContract', () => {
       const result = await pairContract.getReserves();
 
       expect(mockContract.getReserves).toHaveBeenCalledTimes(1);
-      expect(result).toEqual(mockReserves);
+      expect(result).toEqual({
+        reserve0: MOCK_RESERVES.TOKEN_A_RESERVE,
+        reserve1: MOCK_RESERVES.TOKEN_B_RESERVE,
+        blockTimestampLast: MOCK_RESERVES.BLOCK_TIMESTAMP,
+      });
     });
 
     it('should handle contract errors', async () => {
@@ -75,7 +71,7 @@ describe('PairContract', () => {
       const result = await pairContract.token0();
 
       expect(mockContract.token0).toHaveBeenCalledTimes(1);
-      expect(result).toBe(mockToken0);
+      expect(result).toBe(MOCK_ADDRESSES.TOKEN_A);
     });
 
     it('should handle contract errors', async () => {
@@ -91,7 +87,7 @@ describe('PairContract', () => {
       const result = await pairContract.token1();
 
       expect(mockContract.token1).toHaveBeenCalledTimes(1);
-      expect(result).toBe(mockToken1);
+      expect(result).toBe(MOCK_ADDRESSES.TOKEN_B);
     });
 
     it('should handle contract errors', async () => {

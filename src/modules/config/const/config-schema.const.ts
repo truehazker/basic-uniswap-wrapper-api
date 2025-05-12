@@ -27,6 +27,12 @@ export const configSchema = z.object({
     .string()
     .regex(/^0x[a-fA-F0-9]{40}$/)
     .default('0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'),
+
+  PAIR_CACHE_TTL: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .default('3600000'),
 });
 
 export type TConfig = z.infer<typeof configSchema>;

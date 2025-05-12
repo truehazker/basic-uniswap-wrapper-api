@@ -8,6 +8,7 @@ import {
   createMockGetPairContract,
 } from '../utils/uniswap.test-utils';
 import { ConfigModule } from '@modules/config/config.module';
+import { CacheModule } from '@nestjs/cache-manager';
 
 describe('UniswapService', () => {
   let service: UniswapService;
@@ -17,7 +18,7 @@ describe('UniswapService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      imports: [ConfigModule],
+      imports: [ConfigModule, CacheModule.register()],
       providers: [UniswapService],
     }).compile();
 

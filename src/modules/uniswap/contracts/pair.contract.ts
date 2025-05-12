@@ -3,7 +3,7 @@ import { AddressLike, ethers } from 'ethers';
 interface IGetReserves {
   reserve0: bigint;
   reserve1: bigint;
-  blockTimestampLast: bigint;
+  blockTimestampLast: number;
 }
 
 // Uniswap V2 Pair ABI
@@ -34,7 +34,7 @@ export class PairContract {
     return {
       reserve0: BigInt(reserve0),
       reserve1: BigInt(reserve1),
-      blockTimestampLast: BigInt(blockTimestampLast),
+      blockTimestampLast: Number(blockTimestampLast),
     };
   }
 

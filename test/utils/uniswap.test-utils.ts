@@ -73,3 +73,6 @@ export const calculateExpectedAmountOut = (amountIn: string): string => {
 
   return `0x${amountOut.toString(16)}`;
 };
+
+export const getMockCacheKey = (tokenA: string, tokenB: string) =>
+  `pair_address_${tokenA.toLowerCase()}_${tokenB.toLowerCase()}`;
