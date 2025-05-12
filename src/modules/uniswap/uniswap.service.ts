@@ -3,25 +3,33 @@ import {
   Logger,
   NotFoundException,
   OnModuleDestroy,
-  OnModuleInit,
+  Inject,
 } from '@nestjs/common';
 import { ethers, getAddress, keccak256, solidityPacked } from 'ethers';
 import { ConfigService } from '../config/config.service';
 import { THexString } from '@/types/common';
 import { PairContract } from './contracts/pair.contract';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 // Uniswap V2 INIT_CODE_HASH
 const INIT_CODE_HASH =
   '0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f';
 
+export interface IPairContractOptions {
+  refresh?: boolean;
+}
+
 @Injectable()
-export class UniswapService implements OnModuleInit, OnModuleDestroy {
+export class UniswapService implements OnModuleDestroy {
   private readonly logger = new Logger(UniswapService.name);
   private provider: ethers.JsonRpcProvider;
+  private readonly PAIR_CACHE_PREFIX = 'pair_address_';
 
-  constructor(private configService: ConfigService) {}
-
-  async onModuleInit() {
+  constructor(
+    private configService: ConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {
     this.provider = new ethers.JsonRpcProvider(
       this.configService.get('RPC_URL'),
     );
@@ -59,10 +67,32 @@ export class UniswapService implements OnModuleInit, OnModuleDestroy {
     return pairAddress;
   }
 
+  private getCacheKey(tokenA: string, tokenB: string): string {
+    // Sort tokens to ensure consistent cache key regardless of parameter order
+    const [token0, token1] =
+      tokenA.toLowerCase() < tokenB.toLowerCase()
+        ? [tokenA.toLowerCase(), tokenB.toLowerCase()]
+        : [tokenB.toLowerCase(), tokenA.toLowerCase()];
+    return `${this.PAIR_CACHE_PREFIX}${token0}_${token1}`;
+  }
+
   private async getPairContract(
     tokenA: string,
     tokenB: string,
+    options: IPairContractOptions = {},
   ): Promise<PairContract> {
+    const { refresh = false } = options;
+    const cacheKey = this.getCacheKey(tokenA, tokenB);
+
+    // Check cache first (unless refresh is true)
+    if (!refresh) {
+      const cachedPairAddress = await this.cacheManager.get<string>(cacheKey);
+      if (cachedPairAddress) {
+        this.logger.verbose(`Using cached pair address: ${cachedPairAddress}`);
+        return new PairContract(cachedPairAddress, this.provider);
+      }
+    }
+
     const factoryAddress = this.configService.get('UNISWAP_FACTORY_ADDRESS');
     const pairAddress = this.calculatePairAddress(
       factoryAddress,
@@ -75,6 +105,14 @@ export class UniswapService implements OnModuleInit, OnModuleDestroy {
     if (code === '0x') {
       throw new NotFoundException('Pair contract not found');
     }
+
+    // Only cache if the pair exists
+    await this.cacheManager.set(
+      cacheKey,
+      pairAddress,
+      this.configService.get('PAIR_CACHE_TTL'),
+    );
+    this.logger.verbose(`Cached pair address: ${pairAddress}`);
 
     return new PairContract(pairAddress, this.provider);
   }
