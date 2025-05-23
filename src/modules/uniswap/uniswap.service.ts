@@ -1,16 +1,10 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  OnModuleDestroy,
-  Inject,
-} from '@nestjs/common';
-import { ethers, getAddress, keccak256, solidityPacked } from 'ethers';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { getAddress, keccak256, solidityPacked } from 'ethers';
 import { ConfigService } from '../config/config.service';
 import { THexString } from '@/types/common';
 import { PairContract } from './contracts/pair.contract';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
+import { BlockchainService } from '../blockchain/blockchain.service';
+import { CacheService } from '../cache/cache.service';
 
 // Uniswap V2 INIT_CODE_HASH
 const INIT_CODE_HASH =
@@ -21,23 +15,14 @@ export interface IPairContractOptions {
 }
 
 @Injectable()
-export class UniswapService implements OnModuleDestroy {
+export class UniswapService {
   private readonly logger = new Logger(UniswapService.name);
-  private provider: ethers.JsonRpcProvider;
-  private readonly PAIR_CACHE_PREFIX = 'pair_address_';
 
   constructor(
     private configService: ConfigService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {
-    this.provider = new ethers.JsonRpcProvider(
-      this.configService.get('RPC_URL'),
-    );
-  }
-
-  async onModuleDestroy() {
-    this.provider.destroy();
-  }
+    private blockchainService: BlockchainService,
+    private cacheService: CacheService,
+  ) {}
 
   private calculatePairAddress(
     factory: string,
@@ -67,29 +52,29 @@ export class UniswapService implements OnModuleDestroy {
     return pairAddress;
   }
 
-  private getCacheKey(tokenA: string, tokenB: string): string {
-    // Sort tokens to ensure consistent cache key regardless of parameter order
-    const [token0, token1] =
-      tokenA.toLowerCase() < tokenB.toLowerCase()
-        ? [tokenA.toLowerCase(), tokenB.toLowerCase()]
-        : [tokenB.toLowerCase(), tokenA.toLowerCase()];
-    return `${this.PAIR_CACHE_PREFIX}${token0}_${token1}`;
-  }
-
   private async getPairContract(
     tokenA: string,
     tokenB: string,
     options: IPairContractOptions = {},
   ): Promise<PairContract> {
     const { refresh = false } = options;
-    const cacheKey = this.getCacheKey(tokenA, tokenB);
+
+    // Sort tokens for consistent cache key
+    const [token0, token1] =
+      tokenA.toLowerCase() < tokenB.toLowerCase()
+        ? [tokenA.toLowerCase(), tokenB.toLowerCase()]
+        : [tokenB.toLowerCase(), tokenA.toLowerCase()];
+    const cacheKey = `uniswap:pair:${token0}_${token1}`;
 
     // Check cache first (unless refresh is true)
     if (!refresh) {
-      const cachedPairAddress = await this.cacheManager.get<string>(cacheKey);
-      if (cachedPairAddress) {
-        this.logger.verbose(`Using cached pair address: ${cachedPairAddress}`);
-        return new PairContract(cachedPairAddress, this.provider);
+      const cachedAddress = await this.cacheService.get<string>(cacheKey);
+      if (cachedAddress) {
+        this.logger.verbose(`Using cached pair: ${cachedAddress}`);
+        return new PairContract(
+          cachedAddress,
+          this.blockchainService.getProvider(),
+        );
       }
     }
 
@@ -99,22 +84,22 @@ export class UniswapService implements OnModuleDestroy {
       tokenA,
       tokenB,
     );
-    const code = await this.provider.getCode(pairAddress);
+    const code = await this.blockchainService.getCode(pairAddress);
 
-    // Check if the pair contract exists (costs 20 points)
+    // Check if the pair contract exists
     if (code === '0x') {
       throw new NotFoundException('Pair contract not found');
     }
 
-    // Only cache if the pair exists
-    await this.cacheManager.set(
+    // Cache the pair address
+    await this.cacheService.set(
       cacheKey,
       pairAddress,
       this.configService.get('PAIR_CACHE_TTL'),
     );
-    this.logger.verbose(`Cached pair address: ${pairAddress}`);
+    this.logger.verbose(`Cached pair: ${pairAddress}`);
 
-    return new PairContract(pairAddress, this.provider);
+    return new PairContract(pairAddress, this.blockchainService.getProvider());
   }
 
   async getAmountOut(
@@ -144,8 +129,12 @@ export class UniswapService implements OnModuleDestroy {
           ? reserves.reserve1
           : reserves.reserve0;
 
-      // Uniswap V2 formula: amountOut = (amountIn * reserveOut) / (reserveIn + amountIn)
-      const amountOut = (amountInBN * reserveOut) / (reserveIn + amountInBN);
+      // Uniswap V2 formula: amountOut = (amountIn * 997 * reserveOut) / (reserveIn * 1000 + amountIn * 997)
+      // The 997/1000 factor accounts for the 0.3% trading fee
+      const amountInWithFee = amountInBN * BigInt(997);
+      const numerator = amountInWithFee * reserveOut;
+      const denominator = reserveIn * BigInt(1000) + amountInWithFee;
+      const amountOut = numerator / denominator;
 
       return `0x${amountOut.toString(16)}`;
     } catch (error) {
