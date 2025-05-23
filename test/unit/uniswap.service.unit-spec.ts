@@ -8,7 +8,8 @@ import {
   createMockGetPairContract,
 } from '../utils/uniswap.test-utils';
 import { ConfigModule } from '@modules/config/config.module';
-import { CacheModule } from '@nestjs/cache-manager';
+import { BlockchainModule } from '@modules/blockchain/blockchain.module';
+import { CacheModule } from '@modules/cache/cache.module';
 
 describe('UniswapService', () => {
   let service: UniswapService;
@@ -18,7 +19,7 @@ describe('UniswapService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      imports: [ConfigModule, CacheModule.register()],
+      imports: [ConfigModule, BlockchainModule, CacheModule],
       providers: [UniswapService],
     }).compile();
 

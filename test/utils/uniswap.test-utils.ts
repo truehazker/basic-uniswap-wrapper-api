@@ -68,11 +68,21 @@ export const calculateExpectedAmountOut = (amountIn: string): string => {
   const reserveIn = MOCK_RESERVES.TOKEN_A_RESERVE;
   const reserveOut = MOCK_RESERVES.TOKEN_B_RESERVE;
 
-  // Uniswap V2 formula: amountOut = (amountIn * reserveOut) / (reserveIn + amountIn)
-  const amountOut = (amountInBN * reserveOut) / (reserveIn + amountInBN);
+  // Uniswap V2 formula with 0.3% fee:
+  // amountOut = (amountIn * 997 * reserveOut) / (reserveIn * 1000 + amountIn * 997)
+  const amountInWithFee = amountInBN * BigInt(997);
+  const numerator = amountInWithFee * reserveOut;
+  const denominator = reserveIn * BigInt(1000) + amountInWithFee;
+  const amountOut = numerator / denominator;
 
   return `0x${amountOut.toString(16)}`;
 };
 
-export const getMockCacheKey = (tokenA: string, tokenB: string) =>
-  `pair_address_${tokenA.toLowerCase()}_${tokenB.toLowerCase()}`;
+export const getMockCacheKey = (tokenA: string, tokenB: string) => {
+  // Sort tokens for consistent cache key (same logic as service)
+  const [token0, token1] =
+    tokenA.toLowerCase() < tokenB.toLowerCase()
+      ? [tokenA.toLowerCase(), tokenB.toLowerCase()]
+      : [tokenB.toLowerCase(), tokenA.toLowerCase()];
+  return `uniswap:pair:${token0}_${token1}`;
+};

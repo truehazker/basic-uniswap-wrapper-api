@@ -1,17 +1,15 @@
 import {
   Injectable,
-  Inject,
   OnModuleInit,
   OnModuleDestroy,
   Logger,
   BadGatewayException,
 } from '@nestjs/common';
-import { Cache } from 'cache-manager';
-import { ethers } from 'ethers';
 import { ConfigService } from '../config/config.service';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { GasPriceResponseDto } from './dtos/gas-price.dto';
 import { THexString } from '@/types/common';
+import { BlockchainService } from '../blockchain/blockchain.service';
+import { CacheService } from '../cache/cache.service';
 
 export interface IGasPriceOptions {
   refresh?: boolean;
@@ -19,26 +17,19 @@ export interface IGasPriceOptions {
 
 @Injectable()
 export class GasPriceService implements OnModuleInit, OnModuleDestroy {
-  private provider: ethers.JsonRpcProvider;
-  private readonly CACHE_KEY = 'gas_price';
-  private readonly CACHE_TTL: number;
   private readonly logger = new Logger(GasPriceService.name);
   private updateInterval: NodeJS.Timeout;
 
   constructor(
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private cacheService: CacheService,
     private configService: ConfigService,
-  ) {
-    this.CACHE_TTL = this.configService.get('GAS_MONITORING_INTERVAL');
-    this.provider = new ethers.JsonRpcProvider(
-      this.configService.get('RPC_URL'),
-    );
-  }
+    private blockchainService: BlockchainService,
+  ) {}
 
   async onModuleInit() {
     try {
       const { gasPrice } = await this.getGasPrice();
-      this.logger.verbose(`Initial gas price fetched: ${gasPrice}`);
+      this.logger.verbose(`Initial gas price: ${gasPrice}`);
     } catch (error) {
       this.logger.error('Failed to fetch initial gas price:', error);
     }
@@ -56,31 +47,30 @@ export class GasPriceService implements OnModuleInit, OnModuleDestroy {
   async getGasPrice({
     refresh = false,
   }: IGasPriceOptions = {}): Promise<GasPriceResponseDto> {
-    const cachedGasPrice = await this.cacheManager.get<THexString>(
-      this.CACHE_KEY,
-    );
+    const cacheKey = 'gas-price:current';
 
-    if (cachedGasPrice && !refresh) {
-      return { gasPrice: cachedGasPrice };
+    if (!refresh) {
+      const cachedPrice = await this.cacheService.get<THexString>(cacheKey);
+      if (cachedPrice) {
+        return { gasPrice: cachedPrice };
+      }
     }
 
-    const gasPrice = (await this.provider.getFeeData()).gasPrice;
+    const gasPrice = (await this.blockchainService.getFeeData()).gasPrice;
 
     if (!gasPrice) {
       throw new BadGatewayException('RPC node returned invalid gas price data');
     }
 
-    const gasPriceInHex: THexString = `0x${gasPrice.toString(16)}`;
+    const gasPriceHex: THexString = `0x${gasPrice.toString(16)}`;
 
-    await this.cacheManager.set<THexString>(
-      this.CACHE_KEY,
-      gasPriceInHex,
-      this.CACHE_TTL,
+    await this.cacheService.set(
+      cacheKey,
+      gasPriceHex,
+      this.configService.get('GAS_MONITORING_INTERVAL'),
     );
 
-    return {
-      gasPrice: gasPriceInHex,
-    };
+    return { gasPrice: gasPriceHex };
   }
 
   // Background job to update gas price periodically
@@ -88,12 +78,11 @@ export class GasPriceService implements OnModuleInit, OnModuleDestroy {
     this.updateInterval = setInterval(async () => {
       try {
         const { gasPrice } = await this.getGasPrice({ refresh: true });
-        await this.cacheManager.set(this.CACHE_KEY, gasPrice);
         this.logger.verbose(`Gas price updated: ${gasPrice}`);
       } catch (error) {
         this.logger.error('Failed to update gas price:', error);
       }
-    }, this.CACHE_TTL);
+    }, this.configService.get('GAS_MONITORING_INTERVAL'));
 
     // Ensure the interval doesn't keep the process alive
     this.updateInterval.unref();

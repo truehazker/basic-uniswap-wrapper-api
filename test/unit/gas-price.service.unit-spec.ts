@@ -1,16 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GasPriceService } from '@/modules/gas-price/gas-price.service';
 import { ConfigService } from '@/modules/config/config.service';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadGatewayException, Logger } from '@nestjs/common';
-import { Cache } from 'cache-manager';
-import { ethers } from 'ethers';
 import { ConfigModule } from '@modules/config/config.module';
+import { BlockchainModule } from '@modules/blockchain/blockchain.module';
+import { CacheModule } from '@modules/cache/cache.module';
+import { CacheService } from '@modules/cache/cache.service';
+import { BlockchainService } from '@modules/blockchain/blockchain.service';
 
 describe('GasPriceService', () => {
   let service: GasPriceService;
-  let cacheManager: Cache;
-  let mockProvider: { getFeeData: jest.Mock };
+  let cacheService: CacheService;
+  let blockchainService: BlockchainService;
   let loggerSpy: jest.SpyInstance;
   let configService: ConfigService;
 
@@ -19,40 +20,18 @@ describe('GasPriceService', () => {
   beforeEach(async () => {
     jest.useFakeTimers();
 
-    const mockCacheManager = {
-      get: jest.fn(),
-      set: jest.fn(),
-    };
-
-    // Mock the JsonRpcProvider
-    mockProvider = {
-      getFeeData: jest.fn().mockResolvedValue({
-        gasPrice: mockGasPrice,
-        maxFeePerGas: null,
-        maxPriorityFeePerGas: null,
-      }),
-    };
-
-    jest
-      .spyOn(ethers, 'JsonRpcProvider')
-      .mockImplementation(
-        () => mockProvider as unknown as ethers.JsonRpcProvider,
-      );
-
     const module: TestingModule = await Test.createTestingModule({
-      imports: [ConfigModule],
-      providers: [
-        GasPriceService,
-        {
-          provide: CACHE_MANAGER,
-          useValue: mockCacheManager,
-        },
-      ],
+      imports: [ConfigModule, BlockchainModule, CacheModule],
+      providers: [GasPriceService],
     }).compile();
 
     service = module.get<GasPriceService>(GasPriceService);
     configService = module.get<ConfigService>(ConfigService);
-    cacheManager = module.get<Cache>(CACHE_MANAGER);
+    cacheService = module.get<CacheService>(CacheService);
+    blockchainService = module.get<BlockchainService>(BlockchainService);
+
+    // Reset all mocks
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
@@ -65,10 +44,15 @@ describe('GasPriceService', () => {
 
   describe('onModuleInit', () => {
     it('should fetch initial gas price on module init', async () => {
+      jest.spyOn(blockchainService, 'getFeeData').mockResolvedValueOnce({
+        gasPrice: mockGasPrice,
+      });
+      jest.spyOn(cacheService, 'set').mockResolvedValueOnce();
+
       await service.onModuleInit();
 
-      expect(mockProvider.getFeeData).toHaveBeenCalled();
-      expect(cacheManager.set).toHaveBeenCalledWith(
+      expect(blockchainService.getFeeData).toHaveBeenCalled();
+      expect(cacheService.set).toHaveBeenCalledWith(
         expect.any(String),
         `0x${mockGasPrice.toString(16)}`,
         expect.any(Number),
@@ -80,17 +64,25 @@ describe('GasPriceService', () => {
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
 
-      mockProvider.getFeeData.mockRejectedValueOnce(new Error('RPC error'));
+      jest
+        .spyOn(blockchainService, 'getFeeData')
+        .mockRejectedValueOnce(new Error('RPC error'));
+      jest.spyOn(cacheService, 'set').mockResolvedValueOnce();
 
       await service.onModuleInit();
 
-      expect(mockProvider.getFeeData).toHaveBeenCalled();
-      expect(cacheManager.set).not.toHaveBeenCalled();
+      expect(blockchainService.getFeeData).toHaveBeenCalled();
+      expect(cacheService.set).not.toHaveBeenCalled();
     });
   });
 
   describe('onModuleDestroy', () => {
     it('should clear update interval on module destroy', async () => {
+      jest.spyOn(blockchainService, 'getFeeData').mockResolvedValueOnce({
+        gasPrice: mockGasPrice,
+      });
+      jest.spyOn(cacheService, 'set').mockResolvedValueOnce();
+
       await service.onModuleInit();
 
       const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
@@ -104,32 +96,41 @@ describe('GasPriceService', () => {
   describe('getGasPrice', () => {
     it('should return cached gas price when available', async () => {
       const cachedGasPrice = '0x1234';
-      jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(cachedGasPrice);
+      jest.spyOn(cacheService, 'get').mockResolvedValueOnce(cachedGasPrice);
+      const getFeeDataSpy = jest.spyOn(blockchainService, 'getFeeData');
 
       const result = await service.getGasPrice();
 
       expect(result).toEqual({ gasPrice: cachedGasPrice });
-      expect(mockProvider.getFeeData).not.toHaveBeenCalled();
+      expect(getFeeDataSpy).not.toHaveBeenCalled();
     });
 
     it('should fetch new gas price when cache is empty', async () => {
-      jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(null);
+      jest.spyOn(cacheService, 'get').mockResolvedValueOnce(null);
+      jest.spyOn(blockchainService, 'getFeeData').mockResolvedValueOnce({
+        gasPrice: mockGasPrice,
+      });
+      jest.spyOn(cacheService, 'set').mockResolvedValueOnce();
 
       const result = await service.getGasPrice();
 
       expect(result).toEqual({ gasPrice: `0x${mockGasPrice.toString(16)}` });
-      expect(mockProvider.getFeeData).toHaveBeenCalled();
-      expect(cacheManager.set).toHaveBeenCalled();
+      expect(blockchainService.getFeeData).toHaveBeenCalled();
+      expect(cacheService.set).toHaveBeenCalled();
     });
 
     it('should fetch new gas price when refresh is true', async () => {
-      jest.spyOn(cacheManager, 'get').mockResolvedValueOnce('0x1234');
+      jest.spyOn(cacheService, 'get').mockResolvedValueOnce('0x1234');
+      jest.spyOn(blockchainService, 'getFeeData').mockResolvedValueOnce({
+        gasPrice: mockGasPrice,
+      });
+      jest.spyOn(cacheService, 'set').mockResolvedValueOnce();
 
       const result = await service.getGasPrice({ refresh: true });
 
       expect(result).toEqual({ gasPrice: `0x${mockGasPrice.toString(16)}` });
-      expect(mockProvider.getFeeData).toHaveBeenCalled();
-      expect(cacheManager.set).toHaveBeenCalled();
+      expect(blockchainService.getFeeData).toHaveBeenCalled();
+      expect(cacheService.set).toHaveBeenCalled();
     });
 
     it('should throw BadGatewayException when gas price is null', async () => {
@@ -137,11 +138,9 @@ describe('GasPriceService', () => {
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
 
-      jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(null);
-      mockProvider.getFeeData.mockResolvedValueOnce({
+      jest.spyOn(cacheService, 'get').mockResolvedValueOnce(null);
+      jest.spyOn(blockchainService, 'getFeeData').mockResolvedValueOnce({
         gasPrice: null,
-        maxFeePerGas: null,
-        maxPriorityFeePerGas: null,
       });
 
       await expect(service.getGasPrice()).rejects.toThrow(BadGatewayException);
@@ -152,8 +151,10 @@ describe('GasPriceService', () => {
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
 
-      jest.spyOn(cacheManager, 'get').mockResolvedValueOnce(null);
-      mockProvider.getFeeData.mockRejectedValueOnce(new Error('RPC error'));
+      jest.spyOn(cacheService, 'get').mockResolvedValueOnce(null);
+      jest
+        .spyOn(blockchainService, 'getFeeData')
+        .mockRejectedValueOnce(new Error('RPC error'));
 
       await expect(service.getGasPrice()).rejects.toThrow('RPC error');
     });
@@ -161,6 +162,11 @@ describe('GasPriceService', () => {
 
   describe('startGasPriceUpdates', () => {
     it('should update gas price periodically', async () => {
+      jest.spyOn(blockchainService, 'getFeeData').mockResolvedValue({
+        gasPrice: mockGasPrice,
+      });
+      jest.spyOn(cacheService, 'set').mockResolvedValue();
+
       // Start the updates
       await service.startGasPriceUpdates();
 
@@ -169,8 +175,8 @@ describe('GasPriceService', () => {
         configService.get('GAS_MONITORING_INTERVAL'),
       );
 
-      expect(mockProvider.getFeeData).toHaveBeenCalled();
-      expect(cacheManager.set).toHaveBeenCalledWith(
+      expect(blockchainService.getFeeData).toHaveBeenCalled();
+      expect(cacheService.set).toHaveBeenCalledWith(
         expect.any(String),
         `0x${mockGasPrice.toString(16)}`,
         expect.any(Number),
@@ -182,7 +188,10 @@ describe('GasPriceService', () => {
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
 
-      mockProvider.getFeeData.mockRejectedValueOnce(new Error('RPC error'));
+      jest
+        .spyOn(blockchainService, 'getFeeData')
+        .mockRejectedValue(new Error('RPC error'));
+      jest.spyOn(cacheService, 'set').mockResolvedValue();
 
       // Start the updates
       await service.startGasPriceUpdates();
@@ -192,8 +201,8 @@ describe('GasPriceService', () => {
         configService.get('GAS_MONITORING_INTERVAL'),
       );
 
-      expect(mockProvider.getFeeData).toHaveBeenCalled();
-      expect(cacheManager.set).not.toHaveBeenCalled();
+      expect(blockchainService.getFeeData).toHaveBeenCalled();
+      expect(cacheService.set).not.toHaveBeenCalled();
     });
   });
 });
